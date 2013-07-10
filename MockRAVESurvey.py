@@ -21,7 +21,6 @@ def Til_equal(a1,a2):
 # -----------------------------------------------------------------------------
 
 
-
 class MockRaveSurvey(object):
     def __init__(self,
                  fname,
@@ -107,35 +106,36 @@ class MockRaveSurvey(object):
         sorts it using 'healpy' and computes the (relative) I magnitude
         distribution in each healpy pixel.
         '''
-#        if self.VERBOSE:
-        print 'Loading RAVE data.'
-        self.RAVE = ebfpy.readEBFObjs('/scratch/01/til/Full_RAVE_plus_AddOns.ebf')
+        if self.VERBOSE:
+            print 'Loading RAVE data.'
+        #self.RAVE = ebfpy.readEBFObjs('/scratch/01/til/Full_RAVE_plus_AddOns.ebf')
+        self.RAVE = ebfpy.readEBFObjs('/scratch/01/til/RAVE_DR4.ebf')
 
         if self.VERBOSE:
             print 'Applying RAVE DR2 Imag correction.'
         #self.RAVE['corrImag'] = RAVEpy.RAVE_DR2_ImagCorrection(self.RAVE['/idenis'],
         #                                                self.RAVE['/j2mass'],
         #                                                self.RAVE['/k2mass'])
-        self.RAVE['corrImag'] = RAVEpy.computeI2MASS(self.RAVE['/j2mass'],
-                                                        self.RAVE['/k2mass'])
+        self.RAVE['corrImag'] = RAVEpy.computeI2MASS(self.RAVE['/jmag_2mass'],
+                                                        self.RAVE['/kmag_2mass'])
 
         # Extract usable data entries
         Nlines = len(self.RAVE['/raveid'])
 	ABCorder = argsort(self.RAVE['/raveid'])
         use = zeros(Nlines,dtype=bool)
         use[0] = True
-        SN = self.RAVE['/stn_vdr3'][ABCorder[0]]
+        SN = self.RAVE['/snr_k'][ABCorder[0]]
         iSN = 0
         for i in range(1,Nlines):
             if self.RAVE['/raveid'][ABCorder[i]] == self.RAVE['/raveid'][ABCorder[i-1]]:
-                if self.RAVE['/stn_vdr3'][ABCorder[i]] > SN:
+                if self.RAVE['/snr_k'][ABCorder[i]] > SN:
                     use[ABCorder[iSN]] = False
                     use[ABCorder[i]] = True
-                    SN = self.RAVE['/stn_vdr3'][ABCorder[i]]
+                    SN = self.RAVE['/snr_k'][ABCorder[i]]
                     iSN = i
             else:
                 use[ABCorder[i]] = True
-                SN = self.RAVE['/stn_vdr3'][ABCorder[i]]
+                SN = self.RAVE['/snr_k'][ABCorder[i]]
                 iSN = i
         goodZeroPoint = array(['*' not in self.RAVE['/zeropointflag'][i] for i in range(Nlines)])
 
@@ -143,38 +143,41 @@ class MockRaveSurvey(object):
         # ===============================================================================================
         # ===============================================================================================
         # Select "good" observations
-        matisse = (self.RAVE['/algo_conv_k']=='0')|(self.RAVE['/algo_conv_k']=='2')
+        matisse = (self.RAVE['/algo_conv_k']==0)|(self.RAVE['/algo_conv_k']==2)
         #matisse_degas = (self.RAVE['/algo_conv_k']!='1')&(self.RAVE['/algo_conv_k']!='4')
         #cb_measured = self.RAVE['/met_c'] < 1e9
         good = use &\
             matisse &\
             (self.RAVE['/correlationcoeff'] >= 10) &\
             (self.RAVE['/spectraflag']=='NaN') &\
-            (self.RAVE['/xidquality2mass']=='A') &\
+            (self.RAVE['/xidqualityflag_2mass']=='A') &\
             goodZeroPoint &\
             (abs(self.RAVE['/correctionrv'])<10.) &\
-            (self.RAVE['/class1_flag'] == 'n') &\
-            (self.RAVE['/class2_flag'] == 'n') &\
-            (self.RAVE['/class3_flag'] == 'n') &\
+            (self.RAVE['/c1'] == 'n') &\
+            (self.RAVE['/c2'] == 'n') &\
+            (self.RAVE['/c3'] == 'n') &\
+            (self.RAVE['/c4'] == 'n') &\
+            (self.RAVE['/c5'] == 'n') &\
+            (self.RAVE['/c6'] == 'n') &\
             ((abs(self.RAVE['/b']) >= self.b_Range[1])|\
-             (self.RAVE['/j2mass']-self.RAVE['/k2mass'] >= self.JmK_min))
-        STN40 = (self.RAVE['/stn_vdr3']>=40.)
+             (self.RAVE['/jmag_2mass']-self.RAVE['/kmag_2mass'] >= self.JmK_min))
+        STN40 = (self.RAVE['/snr_k']>=40.)
         take = good & STN40
 
         if not self.useAbsoluteImagDistribution:
-            complete2MASS = (self.RAVE['/j2mass'] >= self.J_Range[0])&(self.RAVE['/j2mass'] <= self.J_Range[1]) \
-                &(self.RAVE['/k2mass'] >= self.K_Range[0])&(self.RAVE['/j2mass'] <= self.K_Range[1])
+            complete2MASS = (self.RAVE['/jmag_2mass'] >= self.J_Range[0])&(self.RAVE['/jmag_2mass'] <= self.J_Range[1]) \
+                &(self.RAVE['/kmag_2mass'] >= self.K_Range[0])&(self.RAVE['/kmag_2mass'] <= self.K_Range[1])
 
             #tmp = self.RAVE['/j2mass'] + 1.103*(self.RAVE['/j2mass']-self.RAVE['/k2mass']) + 0.07
-            tmp = RAVEpy.computeI2MASS(self.RAVE['/j2mass'],self.RAVE['/k2mass'])
-            self.RAVE['/i2mass'] = tmp  # I magnitude computed from 2MASS J,K according to Zwitter (priv. com.)
+            #tmp = RAVEpy.computeI2MASS(self.RAVE['/j2mass'],self.RAVE['/k2mass'])
+            self.RAVE['/i2mass'] = self.RAVE['corrImag']  # I magnitude computed from 2MASS J,K according to Zwitter (priv. com.)
             InMagRange = (self.RAVE['/i2mass'] >= self.I_Range[0])&(self.RAVE['/i2mass'] <= self.I_Range[1])
 
             take = take & complete2MASS & InMagRange
         else:
             InMagRange = (self.RAVE['corrImag'] >= self.I_Range[0])&(self.RAVE['corrImag'] <= self.I_Range[1])
             take = take & InMagRange
-        print sum(take)
+        print 'Number of RAVE stars in sample: ',sum(take)
 
         # The fields within the Galactic plane and near the Bulge seem to be problematic so we leave them out
         problematic = \
@@ -857,8 +860,8 @@ if __name__ == '__main__':
     #sim,fname,rel = '/z/til/ChemoDynModel/GalaxiaOutput/SmoothingTests','/ChDM_M5_fakeSmoothing.ebf',False
     #sim,fname,rel = '/z/til/ChemoDynModel/GalaxiaOutput/SmoothingTests_d3n64','/ChDM_M5_fakeSmoothing64.ebf',False
     #sim,fname,rel = '/z/til/ChemoDynModel/GalaxiaOutput/imf_Scalo86_PARSEC-Isochrones','/ChemoDynModel_M5_smoothing_from_random_azimuth.ebf',False
-    sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2.ebf','/6D',False
-    #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2_3D.ebf','/3D',False
+    #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2.ebf','/6D',False
+    sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2_3D.ebf','/3D',False
     #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2_6D.ebf','/4D',False
     #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86','/ChDM_M10_stacked2_3D.ebf','/3D',False
 
