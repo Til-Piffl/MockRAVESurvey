@@ -669,7 +669,7 @@ def introduceObservationalErrors(d,RAVE_sample =['all'],seed=12,\
                      (d.Survey['/metal'] >= -0.7)&(d.Survey['/metal'] < -0.25)
     region_m['Gc'] = (d.Survey['/grav']>=3.5)&(d.Survey['/teff']<=5000)&(d.Survey['/metal'] >= -0.25)
 
-    Ntot = len(d.RAVE['/logg'])
+    Ntot = len(d.RAVE['/logg_k'])
     Ntot_m = len(d.Survey['/grav'])
     ids_RAVE = arange(Ntot)
     uncert_id = zeros(Ntot_m,dtype=int)
