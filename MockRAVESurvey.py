@@ -686,8 +686,8 @@ def introduceObservationalErrors(d,RAVE_sample =['all'],seed=12,\
     e['emet_int'] = emet_int
 
     if vel_errors:
-        epmRA = d.RAVE['/epmra'][uncert_id]
-        epmDE = d.RAVE['/epmde'][uncert_id]
+        epmRA = d.RAVE['/epmra_ucac4'][uncert_id]
+        epmDE = d.RAVE['/epmde_ucac4'][uncert_id]
         e['ehRV'] = d.RAVE['/ehrv'][uncert_id]
         # Attach other e_pm if no e_pm is available for a RAVE star
         wi_pm = isfinite(epmRA)
