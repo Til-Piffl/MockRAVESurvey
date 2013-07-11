@@ -23,6 +23,7 @@ def Til_equal(a1,a2):
 
 class MockRaveSurvey(object):
     def __init__(self,
+                 STN_min,
                  fname,
                  outputFolder = 'as fname',
                  useAbsoluteImagDistribution = False,
@@ -34,6 +35,7 @@ class MockRaveSurvey(object):
         self.EBFfilename = fname
         self.seed = seed
         self.metal_correction = metal_correction_flag
+        self.STN_min = STN_min
 
         if outputFolder == 'as fname':
             self.outputDir = fname[:-4]
@@ -119,57 +121,61 @@ class MockRaveSurvey(object):
         self.RAVE['corrImag'] = RAVEpy.computeI2MASS(self.RAVE['/jmag_2mass'],
                                                         self.RAVE['/kmag_2mass'])
 
+
+        # ===============================================================================================
+        # ===============================================================================================
+        # ===============================================================================================
+
         # Extract usable data entries
         Nlines = len(self.RAVE['/raveid'])
 	ABCorder = argsort(self.RAVE['/raveid'])
-        use = zeros(Nlines,dtype=bool)
-        use[0] = True
+        unique = zeros(Nlines,dtype=bool)
+        unique[0] = True
         SN = self.RAVE['/snr_k'][ABCorder[0]]
         iSN = 0
         for i in range(1,Nlines):
             if self.RAVE['/raveid'][ABCorder[i]] == self.RAVE['/raveid'][ABCorder[i-1]]:
                 if self.RAVE['/snr_k'][ABCorder[i]] > SN:
-                    use[ABCorder[iSN]] = False
-                    use[ABCorder[i]] = True
+                    unique[ABCorder[iSN]] = False
+                    unique[ABCorder[i]] = True
                     SN = self.RAVE['/snr_k'][ABCorder[i]]
                     iSN = i
             else:
-                use[ABCorder[i]] = True
+                unique[ABCorder[i]] = True
                 SN = self.RAVE['/snr_k'][ABCorder[i]]
                 iSN = i
-        goodZeroPoint = array(['*' not in self.RAVE['/zeropointflag'][i] for i in range(Nlines)])
 
-        # ===============================================================================================
-        # ===============================================================================================
-        # ===============================================================================================
+        #goodZeroPoint = array(['*' not in self.RAVE['/zeropointflag'][i] for i in range(Nlines)])
+
+        # Classification by Matijevic
+        good_Matijevic = \
+            (self.RAVE['/c1'] != 'c') & (self.RAVE['/c1'] != 'w') &\
+            (self.RAVE['/c2'] != 'c') & (self.RAVE['/c2'] != 'w') &\
+            (self.RAVE['/c3'] != 'c') & (self.RAVE['/c3'] != 'w') &\
+            (self.RAVE['/c4'] != 'c') & (self.RAVE['/c4'] != 'w') &\
+            (self.RAVE['/c5'] != 'c') & (self.RAVE['/c5'] != 'w') &\
+            (self.RAVE['/c6'] != 'c') & (self.RAVE['/c6'] != 'w')
+        # Enforce color cut below |b| = 25
+        color_cut =  (abs(self.RAVE['/b']) >= self.b_Range[1]) | \
+             (self.RAVE['/jmag_2mass']-self.RAVE['/kmag_2mass'] >= self.JmK_min)
+            
+
         # Select "good" observations
-        matisse = (self.RAVE['/algo_conv_k']==0)|(self.RAVE['/algo_conv_k']==2)
-        #matisse_degas = (self.RAVE['/algo_conv_k']!='1')&(self.RAVE['/algo_conv_k']!='4')
-        #cb_measured = self.RAVE['/met_c'] < 1e9
-        good = use &\
-            matisse &\
+        take = unique &\
+            good_Matijevic &\
+            color_cut &\
             (self.RAVE['/correlationcoeff'] >= 10) &\
             (self.RAVE['/spectraflag']=='NaN') &\
             (self.RAVE['/xidqualityflag_2mass']=='A') &\
-            goodZeroPoint &\
             (abs(self.RAVE['/correctionrv'])<10.) &\
-            (self.RAVE['/c1'] == 'n') &\
-            (self.RAVE['/c2'] == 'n') &\
-            (self.RAVE['/c3'] == 'n') &\
-            (self.RAVE['/c4'] == 'n') &\
-            (self.RAVE['/c5'] == 'n') &\
-            (self.RAVE['/c6'] == 'n') &\
-            ((abs(self.RAVE['/b']) >= self.b_Range[1])|\
-             (self.RAVE['/jmag_2mass']-self.RAVE['/kmag_2mass'] >= self.JmK_min))
-        STN40 = (self.RAVE['/snr_k']>=40.)
-        take = good & STN40
+            (self.RAVE['/ehrv']<7.) &\
+            (self.RAVE['/de'] <= 0) &\
+            (self.RAVE['/snr_k']>=self.STN_min)
 
         if not self.useAbsoluteImagDistribution:
             complete2MASS = (self.RAVE['/jmag_2mass'] >= self.J_Range[0])&(self.RAVE['/jmag_2mass'] <= self.J_Range[1]) \
                 &(self.RAVE['/kmag_2mass'] >= self.K_Range[0])&(self.RAVE['/kmag_2mass'] <= self.K_Range[1])
 
-            #tmp = self.RAVE['/j2mass'] + 1.103*(self.RAVE['/j2mass']-self.RAVE['/k2mass']) + 0.07
-            #tmp = RAVEpy.computeI2MASS(self.RAVE['/j2mass'],self.RAVE['/k2mass'])
             self.RAVE['/i2mass'] = self.RAVE['corrImag']  # I magnitude computed from 2MASS J,K according to Zwitter (priv. com.)
             InMagRange = (self.RAVE['/i2mass'] >= self.I_Range[0])&(self.RAVE['/i2mass'] <= self.I_Range[1])
 
@@ -182,7 +188,7 @@ class MockRaveSurvey(object):
         # The fields within the Galactic plane and near the Bulge seem to be problematic so we leave them out
         problematic = \
             (abs(self.RAVE['/b']) < 5) |\
-            ((abs(self.RAVE['/b']) < 10.)&(self.RAVE['/l']<45.)&(self.RAVE['/l']>315.)) |\
+            ((abs(self.RAVE['/b']) < 10.)&((self.RAVE['/l']<45.)|(self.RAVE['/l']>315.))) |\
             (((self.RAVE['/l']>330)|(self.RAVE['/l']<30))&(self.RAVE['/b']<25)&(self.RAVE['/b']>0))
         
         # Keep only usable entries
@@ -874,6 +880,6 @@ if __name__ == '__main__':
     
     metal_correction = True
     if True:
-        d = MockRaveSurvey(sim+fname,sim+fold,rel,metal_correction,VERBOSE=False)
+        d = MockRaveSurvey(40,sim+fname,sim+fold,rel,metal_correction,VERBOSE=False)
     else:
         d = load_Survey(sim)
