@@ -96,6 +96,15 @@ class MockRaveSurvey(object):
     # HEALPIX
     NSIDE = 32
 
+    # Parameter space regions ignored by MATISSE
+    #1:
+    log_1,tef_1 = 3.5,4250
+    log_2,tef_2 = 4.5,6250
+    log_3 = 5.5
+    log_4 = 0.
+    tef_5 = 3000
+    tef_6 = 8000
+
     # =============================================================
     # =============================================================
     # =============================================================
@@ -148,13 +157,20 @@ class MockRaveSurvey(object):
         #goodZeroPoint = array(['*' not in self.RAVE['/zeropointflag'][i] for i in range(Nlines)])
 
         # Classification by Matijevic
+        #good_Matijevic = \
+        #    (self.RAVE['/c1'] != 'c') & (self.RAVE['/c1'] != 'w') &\
+        #    (self.RAVE['/c2'] != 'c') & (self.RAVE['/c2'] != 'w') &\
+        #    (self.RAVE['/c3'] != 'c') & (self.RAVE['/c3'] != 'w') &\
+        #    (self.RAVE['/c4'] != 'c') & (self.RAVE['/c4'] != 'w') &\
+        #    (self.RAVE['/c5'] != 'c') & (self.RAVE['/c5'] != 'w') &\
+        #    (self.RAVE['/c6'] != 'c') & (self.RAVE['/c6'] != 'w')
         good_Matijevic = \
-            (self.RAVE['/c1'] != 'c') & (self.RAVE['/c1'] != 'w') &\
-            (self.RAVE['/c2'] != 'c') & (self.RAVE['/c2'] != 'w') &\
-            (self.RAVE['/c3'] != 'c') & (self.RAVE['/c3'] != 'w') &\
-            (self.RAVE['/c4'] != 'c') & (self.RAVE['/c4'] != 'w') &\
-            (self.RAVE['/c5'] != 'c') & (self.RAVE['/c5'] != 'w') &\
-            (self.RAVE['/c6'] != 'c') & (self.RAVE['/c6'] != 'w')
+            (self.RAVE['/c1'] == 'n') &\
+            (self.RAVE['/c2'] == 'n') &\
+            (self.RAVE['/c3'] == 'n') &\
+            (self.RAVE['/c4'] == 'n') &\
+            (self.RAVE['/c5'] == 'n') &\
+            (self.RAVE['/c6'] == 'n') 
         # Enforce color cut below |b| = 25
         color_cut =  (abs(self.RAVE['/b']) >= self.b_Range[1]) | \
              (self.RAVE['/jmag_2mass']-self.RAVE['/kmag_2mass'] >= self.JmK_min)
@@ -396,25 +412,18 @@ class MockRaveSurvey(object):
             print '  Declination < %i degree'%(int(max(self.RAVE['/de']))+1)
             print '  For %.1f < Gal. lattitude < %.1f degree: J-K > %.1f mag'\
                                 %(self.b_Range[0],self.b_Range[1],self.JmK_min)
-        keep = (self.Survey['DE'] <= int(max(self.RAVE['/de']))+1) \
-             & (  (abs(self.Survey['b']) < self.b_Range[0]) \
-                | (abs(self.Survey['b']) >= self.b_Range[1]) \
-                | (self.Survey['Jmag'] - self.Survey['Kmag'] >= self.JmK_min)) \
-             & (self.Survey['Jmag'] >= self.J_Range[0])&(self.Survey['Jmag'] <= self.J_Range[1]) \
-             & (self.Survey['Kmag'] >= self.K_Range[0])&(self.Survey['Kmag'] <= self.K_Range[1])
+        keep = (self.Survey['DE'] <= 0) & \
+               ((abs(self.Survey['b']) >= self.b_Range[1]) | (self.Survey['Jmag'] - self.Survey['Kmag'] >= self.JmK_min)) & \
+               (self.Survey['Jmag'] >= self.J_Range[0])&(self.Survey['Jmag'] <= self.J_Range[1]) & \
+               (self.Survey['Kmag'] >= self.K_Range[0])&(self.Survey['Kmag'] <= self.K_Range[1])
         for tag in self.Survey.keys():
             if not tag in ['/Log','/Center','/Typelist','/Typelist1']:
                 self.Survey[tag] = self.Survey[tag][keep]
 
 
         # Compute "proper" RAVE I magnitude
-        #self.Survey['corrImag'] = RAVEpy.RAVE_DR2_ImagCorrection(self.Survey['Imag'],
-        #                                                self.Survey['Jmag'],
-        #                                                self.Survey['Kmag'])
-        self.Survey['corrImag'] = RAVEpy.computeI2MASS(self.Survey['Jmag'],
-                                                        self.Survey['Kmag'])
+        self.Survey['corrImag'] = RAVEpy.computeI2MASS(self.Survey['Jmag'],self.Survey['Kmag'])
         if not self.useAbsoluteImagDistribution:
-            #self.Survey['i2mass'] = self.Survey['Jmag'] + 1.103*(self.Survey['Jmag']-self.Survey['Kmag']) + 0.07
             self.Survey['i2mass'] = RAVEpy.computeI2MASS(self.Survey['Jmag'],self.Survey['Kmag'])
             keep = (self.Survey['i2mass'] >= self.I_Range[0])&(self.Survey['i2mass'] <= self.I_Range[1])
         else:
@@ -867,8 +876,8 @@ if __name__ == '__main__':
     #sim,fname,rel = '/z/til/ChemoDynModel/GalaxiaOutput/SmoothingTests_d3n64','/ChDM_M5_fakeSmoothing64.ebf',False
     #sim,fname,rel = '/z/til/ChemoDynModel/GalaxiaOutput/imf_Scalo86_PARSEC-Isochrones','/ChemoDynModel_M5_smoothing_from_random_azimuth.ebf',False
     #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2.ebf','/6D',False
-    sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2_3D.ebf','/3D',False
-    #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2_6D.ebf','/4D',False
+    #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2_3D.ebf','/3D',False
+    sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86_IsoCorr','/ChDM_M10_stacked2_6D.ebf','/4D',False
     #sim,fname,fold,rel = '/z/til/ChemoDynModel/GalaxiaOutput/stacked2/Scalo86','/ChDM_M10_stacked2_3D.ebf','/3D',False
 
     # Aquarius Simulations
